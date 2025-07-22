@@ -49,6 +49,7 @@ flags.DEFINE_integer('episodes_per_task', 10,
                      'The number of episodes to collect per task.')
 flags.DEFINE_integer('variations', -1,
                      'Number of variations to collect per task. -1 for all.')
+flags.DEFINE_integer('offset', 0, 'Offset for variation count.')
 
 
 VARIATIONS_ALL_FOLDER = 'all_variations'

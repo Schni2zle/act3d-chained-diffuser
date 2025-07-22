@@ -1,7 +1,7 @@
 main_dir=act3d
 
-dataset=/projects/katefgroup/datasets/rlbench/diffusion_trajectories_train/
-valset=/projects/katefgroup/datasets/rlbench/diffusion_trajectories_val/
+dataset=/tmp/rlbench/diffusion_trajectories_train/
+valset=/tmp/rlbench/diffusion_trajectories_val/
 
 task=stack_blocks
 
