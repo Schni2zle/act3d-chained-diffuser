@@ -37,7 +37,9 @@ class Environment(object):
                  frequency: int = 1,
                  visual_randomization_config: VisualRandomizationConfig = None,
                  dynamics_randomization_config: DynamicsRandomizationConfig = None,
-                 attach_grasped_objects: bool = True
+                 attach_grasped_objects: bool = True,
+                 shaped_rewards: bool = False,
+                 floating_cam:bool=False
                  ):
 
         self._dataset_root = dataset_root
@@ -47,11 +49,19 @@ class Environment(object):
         self._static_positions = static_positions
         self._robot_setup = robot_setup.lower()
 
+        action_mode = action_mode if isinstance(action_mode,List) else [action_mode]
+        #assert(len(robot_setup) == len(action_mode))
+        if len(robot_setup)>len(action_mode):
+            action_mode = action_mode*len(robot_setup)
+        self._action_mode = action_mode
+
         self._randomize_every = randomize_every
         self._frequency = frequency
         self._visual_randomization_config = visual_randomization_config
         self._dynamics_randomization_config = dynamics_randomization_config
         self._attach_grasped_objects = attach_grasped_objects
+        self._shaped_rewards = shaped_rewards
+        self._floating_cam = floating_cam
 
         if robot_setup not in SUPPORTED_ROBOTS.keys():
             raise ValueError('robot_configuration must be one of %s' %
@@ -91,7 +101,11 @@ class Environment(object):
         if self._pyrep is not None:
             raise RuntimeError('Already called launch!')
         self._pyrep = PyRep()
-        self._pyrep.launch(join(DIR_PATH, TTT_FILE), headless=self._headless)
+        # self._pyrep.launch(join(DIR_PATH, TTT_FILE), headless=self._headless)
+        if self._floating_cam:
+                self._pyrep.launch(join(DIR_PATH,FLOATING_VP_TTT_FILE), headless=self._headless)
+        else:
+                self._pyrep.launch(join(DIR_PATH, STATIC_TTT_FILE), headless=self._headless)
 
         arm_class, gripper_class, _ = SUPPORTED_ROBOTS[
             self._robot_setup]
@@ -139,7 +153,8 @@ class Environment(object):
         return TaskEnvironment(
             self._pyrep, self._robot, self._scene, task,
             self._action_mode, self._dataset_root, self._obs_config,
-            self._static_positions, self._attach_grasped_objects)
+            self._static_positions, self._attach_grasped_objects,
+            self._shaped_rewards)
 
     @property
     def action_shape(self):
@@ -186,6 +201,7 @@ class Environment(object):
                 self._scene._cam_over_shoulder_right),
             front_camera=_get_cam_info(self._scene._cam_front),
             wrist_camera=_get_cam_info(self._scene._cam_wrist),
+            active_camera=_get_cam_info(self._scene._cam_active),
             overhead_camera=_get_cam_info(self._scene._cam_overhead)
         )
         self.shutdown()

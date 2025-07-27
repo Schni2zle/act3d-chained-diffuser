@@ -2,6 +2,7 @@ import os
 import re
 from os.path import dirname, abspath, join
 from typing import List, Tuple, Callable, Union
+from scipy.spatial.transform import Rotation as R
 
 import numpy as np
 from pyrep import PyRep
@@ -14,7 +15,7 @@ from pyrep.objects.joint import Joint
 from pyrep.objects.object import Object
 
 from rlbench.backend.conditions import Condition
-from rlbench.backend.exceptions import WaypointError
+from rlbench.backend.exceptions import WaypointError, ViewpointError,NoViewpointsError
 from rlbench.backend.observation import Observation
 from rlbench.backend.robot import Robot
 from rlbench.backend.waypoints import Point, PredefinedPath, Waypoint
@@ -37,6 +38,7 @@ class Task(object):
         )
         self.robot = robot
         self._waypoints = None
+        self._viewpoints = None
         self._success_conditions = []
         self._fail_conditions = []
         self._graspable_objects = []
@@ -45,8 +47,15 @@ class Task(object):
         self._waypoint_abilities_start = {}
         self._waypoint_abilities_end = {}
         self._waypoints_should_repeat = lambda: False
+
+        self._viewpoint_additional_inits = {}
+        self._viewpoint_abilities_start = {}
+        self._viewpoint_abilities_end = {}
+
         self._initial_objs_in_scene = None
         self._stop_at_waypoint_index = -1
+        self._stop_at_viewpoint_index = -1
+        self._interactable_objs = []
 
     ########################
     # Overriding functions #
@@ -264,6 +273,13 @@ class Task(object):
         """
         self._stop_at_waypoint_index = waypoint_index
 
+    def register_stop_at_viewpoint(self, viewpoint_index: int):
+        """Register at what index the demo should be stopped.
+
+        :param waypoint_index: The waypoint index.
+        """
+        self._stop_at_viewpoint_index = viewpoint_index
+
     ##########################
     # Other public functions #
     ##########################
@@ -283,12 +299,22 @@ class Task(object):
         if self._waypoints is None:
             self._waypoints = self._get_waypoints()
         return self._waypoints
+    
+    def get_viewpoints(self):
+        if self._viewpoints is None:
+            self._viewpoints = self._get_viewpoints()
+        return self._viewpoints
 
     def should_repeat_waypoints(self):
         return self._waypoints_should_repeat()
 
     def get_graspable_objects(self):
         return self._graspable_objects
+    
+    def get_interactable_objects(self)-> List[Object]:
+        objs = self.get_base().get_objects_in_tree(
+            exclude_base=True, first_generation_only=False)
+        return [ob for ob in objs if ob.get_type().name=="SHAPE" and ob.is_detectable()]
 
     def success(self) -> Tuple[bool, bool]:
         """If the task is currently successful.
@@ -321,6 +347,7 @@ class Task(object):
 
     def unload(self) -> None:
         self._waypoints = None
+        self._viewpoints = None
         self.get_base().remove()
         self.clear_registerings()
 
@@ -328,6 +355,7 @@ class Task(object):
         for cond in self._success_conditions + self._fail_conditions:
             cond.reset()
         self._waypoints = None
+        self._viewpoints = None
         self.cleanup()
 
     def clear_registerings(self) -> None:
@@ -338,6 +366,9 @@ class Task(object):
         self._waypoint_additional_inits = {}
         self._waypoint_abilities_start = {}
         self._waypoint_abilities_end = {}
+        self._viewpoint_additional_inits = {}
+        self._viewpoint_abilities_start = {}
+        self._viewpoint_abilities_end = {}
 
     def get_base(self) -> Dummy:
         self._base_object = Dummy(self.name)
@@ -362,17 +393,43 @@ class Task(object):
 
     def _feasible(self, waypoints: List[Point]) -> Tuple[bool, int]:
         arm = self.robot.arm
+        last_feasible_subpoints = ['Placeholder']
+        print(f"ok lets check feasibility of waypoints {len(waypoints)}")
         start_vals = arm.get_joint_positions()
         for i, point in enumerate(waypoints):
+
+            point_name = point._waypoint.get_name().split('_')
+            print("Checking feasibility of point: ", point_name)
+            if len(point_name)==2 and point_name[-1]=='0':
+
+                if len(last_feasible_subpoints) == 0:
+                    arm.set_joint_positions(start_vals)
+                    return False, -1
+                last_feasible_subpoints.clear()
+
             path = None
             try:
                 path = point.get_path(ignore_collisions=True)
+                if len(point_name)==2:
+                    last_feasible_subpoints.append(point)
+
             except ConfigurationPathError as err:
                 pass
             if path is None:
                 arm.set_joint_positions(start_vals)
-                return False, i
-            path.set_to_end()
+                if len(point_name)==2:
+                    pass
+                else:
+                    return False, i
+            else:
+                path.set_to_end()
+
+        if len(point_name)==2:
+
+            if len(last_feasible_subpoints) == 0:
+                arm.set_joint_positions(start_vals)
+                return False, -1
+            last_feasible_subpoints.clear()
         # Needed twice otherwise can glitch out.
         arm.set_joint_positions(start_vals)
         return True, -1
@@ -427,6 +484,83 @@ class Task(object):
         for func, way in additional_waypoint_inits:
             func(way)
         return waypoints
+    
+    def _get_viewpoints(self, validating=False) -> List[Point]:
+        viewpoints = []
+        additional_viewpoint_inits = []
+        i = 0
+        j = 0
+        while True:
+            if i == self._stop_at_viewpoint_index or not Object.exists('viewpoint{}_0'.format(i)):
+                # There are no more viewpoints...
+                break
+            for j in range(2):
+                name = 'viewpoint{}_{}'.format(i,j)
+                if not Object.exists(name) or i == self._stop_at_viewpoint_index:
+                    # There are no more viewpoints...
+                    break
+                ob_type = Object.get_object_type(name)
+                view = None
+                if ob_type == ObjectType.DUMMY:
+
+                    viewpoint = Dummy(name)
+                    #viewpoint = self.reassign_viewpoint_orientation(viewpoint)
+                    #corresponding_waypoint = self.robot.vision_arm.get_tip_from_view_point(viewpoint)
+                    start_func = None
+                    end_func = None
+                    if i in self._viewpoint_abilities_start:
+                        start_func = self._viewpoint_abilities_start[i]
+                    if i in self._viewpoint_abilities_end:
+                        end_func = self._viewpoint_abilities_end[i]
+
+                    view = Point(viewpoint, self.robot.vision_arm,
+                                start_of_path_func=start_func,
+                                end_of_path_func=end_func)
+                    
+                elif ob_type == ObjectType.PATH:
+                    cartestian_path = CartesianPath(name)
+                    view = PredefinedPath(cartestian_path, self.robot.vision_arm)
+                else:
+                    raise ViewpointError(
+                        '%s is an unsupported viewpoint type %s' % (name, ob_type), self)
+
+                if name in self._viewpoint_additional_inits and not validating:
+                    additional_viewpoint_inits.append(
+                        (self._viewpoint_additional_inits[name], view))
+                viewpoints.append(view)
+            i += 1
+            if i>100 and len(viewpoints)==0:
+                raise NoViewpointsError(
+                    'No viewpoints were found.', self.task)
+
+        # Check if all of the waypoints are feasible
+            
+        feasible, view_i = self._feasible(viewpoints)
+        if not feasible and validating:
+            raise WaypointError(
+                "Infeasible episode. Can't reach viewpoint %d." % view_i, self)
+        for func, view in additional_viewpoint_inits:
+            func(view)
+        return viewpoints
+    
+
+    def reassign_viewpoint_orientation(self,viewpoint:Dummy)->Dummy:
+        viewpoint_quat = viewpoint.get_quaternion()
+        viewpoint_rot_matrix = R.from_quat(viewpoint_quat).as_matrix()
+        viewpoint_z = viewpoint_rot_matrix[:,2]
+        world_y = np.array([0,1,0])
+        reassign_y = np.cross(viewpoint_z,world_y)
+        reassign_x = np.cross(reassign_y,viewpoint_z)
+
+        reassign_y = reassign_y/np.linalg.norm(reassign_y)
+        reassign_x = reassign_x/np.linalg.norm(reassign_x)
+
+        reassign_matrix = np.concatenate([reassign_x,reassign_y,viewpoint_z],axis=0).reshape(3,3).T
+        reassign_quat = R.from_matrix(reassign_matrix).as_quat()
+
+        viewpoint.set_quaternion(reassign_quat)
+
+        return viewpoint
 
     @property
     def state(self):

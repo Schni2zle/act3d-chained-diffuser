@@ -11,7 +11,7 @@ import readline
 from pyrep.const import RenderMode
 
 from rlbench.backend import task
-from rlbench.backend.const import TTT_FILE
+from rlbench.backend.const import TTT_FILE, FLOATING_VP_TTT_FILE
 from pyrep import PyRep
 from pyrep.robots.arms.panda import Panda
 from pyrep.objects.shape import Shape
@@ -271,7 +271,9 @@ if __name__ == '__main__':
     setup_list_completer()
 
     pr = PyRep()
-    ttt_file = join(CURRENT_DIR, '..', 'rlbench', TTT_FILE)
+    # ttt_file = join(CURRENT_DIR, '..', 'rlbench', TTT_FILE)
+    ttt_file = join(CURRENT_DIR, '..', 'rlbench', FLOATING_VP_TTT_FILE)
+
     pr.launch(ttt_file, responsive_ui=True)
     pr.step_ui()
 
@@ -284,6 +286,7 @@ if __name__ == '__main__':
     obs_config.left_shoulder_camera = cam_config
     obs_config.overhead_camera = cam_config
     obs_config.wrist_camera = cam_config
+    obs_config.active_camera = cam_config
     obs_config.front_camera = cam_config
 
     scene = Scene(pr, robot, obs_config)

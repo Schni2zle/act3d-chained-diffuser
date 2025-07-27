@@ -86,6 +86,9 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
         wrist_rgb_f = join(example_path, WRIST_RGB_FOLDER)
         wrist_depth_f = join(example_path, WRIST_DEPTH_FOLDER)
         wrist_mask_f = join(example_path, WRIST_MASK_FOLDER)
+        active_rgb_f = join(example_path, ACTIVE_RGB_FOLDER)
+        active_depth_f = join(example_path, ACTIVE_DEPTH_FOLDER)
+        active_mask_f = join(example_path, ACTIVE_MASK_FOLDER)
         front_rgb_f = join(example_path, FRONT_RGB_FOLDER)
         front_depth_f = join(example_path, FRONT_DEPTH_FOLDER)
         front_mask_f = join(example_path, FRONT_MASK_FOLDER)
@@ -127,6 +130,13 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                 obs[i].wrist_depth = join(wrist_depth_f, si)
             if obs_config.wrist_camera.mask:
                 obs[i].wrist_mask = join(wrist_mask_f, si)
+
+            if obs_config.active_camera.rgb:
+                obs[i].active_rgb = join(active_rgb_f, si)
+            if obs_config.active_camera.depth or obs_config.active_camera.point_cloud:
+                obs[i].active_depth = join(active_depth_f, si)
+            if obs_config.active_camera.mask:
+                obs[i].active_mask = join(active_mask_f, si)
             if obs_config.front_camera.rgb:
                 obs[i].front_rgb = join(front_rgb_f, si)
             if obs_config.front_camera.depth or obs_config.front_camera.point_cloud:
@@ -151,6 +161,8 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                 obs[i].gripper_touch_forces = None
             if not obs_config.task_low_dim_state:
                 obs[i].task_low_dim_state = None
+            if not obs_config.active_camera.rgb:
+                obs[i].active_cam_pose = None
         try:
             if not image_paths:
                 for i in range(num_steps):
@@ -174,6 +186,11 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                             _resize_if_needed(
                                 Image.open(obs[i].wrist_rgb),
                                 obs_config.wrist_camera.image_size))
+                    if obs_config.active_camera.rgb:
+                        obs[i].active_rgb = np.array(
+                            _resize_if_needed(
+                                Image.open(obs[i].active_rgb),
+                                obs_config.active_camera.image_size))
                     if obs_config.front_camera.rgb:
                         obs[i].front_rgb = np.array(
                             _resize_if_needed(
@@ -240,6 +257,21 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                         else:
                             obs[i].wrist_depth = None
 
+                    if obs_config.active_camera.depth or obs_config.active_camera.point_cloud:
+                        active_depth = image_to_float_array(
+                            _resize_if_needed(
+                                Image.open(obs[i].active_depth),
+                                obs_config.active_camera.image_size),
+                            DEPTH_SCALE)
+                        near = obs[i].misc['active_camera_near']
+                        far = obs[i].misc['active_camera_far']
+                        active_depth_m = near + active_depth * (far - near)
+                        if obs_config.active_camera.depth:
+                            d = active_depth_m if obs_config.active_camera.depth_in_meters else active_depth
+                            obs[i].active_depth = obs_config.active_camera.depth_noise.apply(d)
+                        else:
+                            obs[i].active_depth = None
+
                     if obs_config.front_camera.depth or obs_config.front_camera.point_cloud:
                         front_depth = image_to_float_array(
                             _resize_if_needed(
@@ -275,6 +307,11 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                             wrist_depth_m,
                             obs[i].misc['wrist_camera_extrinsics'],
                             obs[i].misc['wrist_camera_intrinsics'])
+                    if obs_config.active_camera.point_cloud:
+                        obs[i].active_point_cloud = VisionSensor.pointcloud_from_depth_and_camera_params(
+                            active_depth_m,
+                            obs[i].misc['active_camera_extrinsics'],
+                            obs[i].misc['active_camera_intrinsics'])
                     if obs_config.front_camera.point_cloud:
                         obs[i].front_point_cloud = VisionSensor.pointcloud_from_depth_and_camera_params(
                             front_depth_m,
@@ -303,6 +340,11 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                             _resize_if_needed(Image.open(
                                 obs[i].wrist_mask),
                                 obs_config.wrist_camera.image_size)))
+                    if obs_config.active_camera.mask:
+                        obs[i].active_mask = rgb_handles_to_mask(np.array(
+                            _resize_if_needed(Image.open(
+                                obs[i].active_mask),
+                                obs_config.active_camera.image_size)))
                     if obs_config.front_camera.mask:
                         obs[i].front_mask = rgb_handles_to_mask(np.array(
                             _resize_if_needed(Image.open(

@@ -9,3 +9,4 @@ class Robot(object):
     def __init__(self, arm: Arm, gripper: Gripper):
         self.arm = arm
         self.gripper = gripper
+        self.vision_arm = arm

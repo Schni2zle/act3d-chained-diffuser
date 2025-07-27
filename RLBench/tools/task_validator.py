@@ -4,7 +4,7 @@ from rlbench.observation_config import ObservationConfig
 from pyrep import PyRep
 from pyrep.robots.arms.panda import Panda
 from pyrep.robots.end_effectors.panda_gripper import PandaGripper
-from rlbench.backend.const import TTT_FILE
+from rlbench.backend.const import FLOATING_VP_TTT_FILE
 from rlbench.backend.scene import Scene
 from rlbench.backend.utils import task_file_to_task_class
 from rlbench.backend.task import TASKS_PATH
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     DIR_PATH = os.path.dirname(os.path.abspath(__file__))
     sim = PyRep()
     ttt_file = os.path.join(
-        DIR_PATH, '..', 'rlbench', TTT_FILE)
+        DIR_PATH, '..', 'rlbench', FLOATING_VP_TTT_FILE)
     sim.launch(ttt_file, headless=True)
     sim.step_ui()
     sim.set_simulation_timestep(0.005)

@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any, Dict, List, Tuple, Union
 
 
 class Observation(object):
@@ -21,6 +22,10 @@ class Observation(object):
                  wrist_depth: np.ndarray,
                  wrist_mask: np.ndarray,
                  wrist_point_cloud: np.ndarray,
+                 active_rgb: np.ndarray,
+                 active_depth: np.ndarray,
+                 active_mask: np.ndarray,
+                 active_point_cloud: np.ndarray,
                  front_rgb: np.ndarray,
                  front_depth: np.ndarray,
                  front_mask: np.ndarray,
@@ -34,7 +39,12 @@ class Observation(object):
                  gripper_joint_positions: np.ndarray,
                  gripper_touch_forces: np.ndarray,
                  task_low_dim_state: np.ndarray,
-                 misc: dict):
+                 misc: dict,
+                 wrist_cam_pose:Union[np.ndarray,None]=None,
+                 active_cam_pose:Union[np.ndarray,None]=None,
+                 
+                 transition_index:Union[int,None]=None,
+                 stage:Union[str,None]=None):
         self.left_shoulder_rgb = left_shoulder_rgb
         self.left_shoulder_depth = left_shoulder_depth
         self.left_shoulder_mask = left_shoulder_mask
@@ -51,6 +61,12 @@ class Observation(object):
         self.wrist_depth = wrist_depth
         self.wrist_mask = wrist_mask
         self.wrist_point_cloud = wrist_point_cloud
+        self.wrist_cam_pose = wrist_cam_pose
+        self.active_rgb = active_rgb
+        self.active_depth = active_depth
+        self.active_mask = active_mask
+        self.active_point_cloud = active_point_cloud
+        self.active_cam_pose = active_cam_pose
         self.front_rgb = front_rgb
         self.front_depth = front_depth
         self.front_mask = front_mask
@@ -65,6 +81,8 @@ class Observation(object):
         self.gripper_touch_forces = gripper_touch_forces
         self.task_low_dim_state = task_low_dim_state
         self.misc = misc
+        self.transition_index = transition_index
+        self.stage = stage
 
     def get_low_dim_data(self) -> np.ndarray:
         """Gets a 1D array of all the low-dimensional obseervations.
@@ -72,10 +90,15 @@ class Observation(object):
         :return: 1D array of observations.
         """
         low_dim_data = [] if self.gripper_open is None else [[self.gripper_open]]
-        for data in [self.joint_velocities, self.joint_positions,
+        keys = [self.joint_velocities, self.joint_positions,
                      self.joint_forces,
                      self.gripper_pose, self.gripper_joint_positions,
-                     self.gripper_touch_forces, self.task_low_dim_state]:
+                     self.gripper_touch_forces, self.task_low_dim_state]
+        
+        
+        keys.extend([self.wrist_cam_pose, self.active_cam_pose])
+        
+        for data in keys:
             if data is not None:
                 low_dim_data.append(data)
         return np.concatenate(low_dim_data) if len(low_dim_data) > 0 else np.array([])

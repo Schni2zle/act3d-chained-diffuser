@@ -41,6 +41,7 @@ class ObservationConfig(object):
         right_shoulder_camera: CameraConfig = None,
         overhead_camera: CameraConfig = None,
         wrist_camera: CameraConfig = None,
+        active_camera: CameraConfig = None,
         front_camera: CameraConfig = None,
         joint_velocities=True,
         joint_velocities_noise: NoiseModel = Identity(),
@@ -54,6 +55,7 @@ class ObservationConfig(object):
         gripper_joint_positions=False,
         gripper_touch_forces=False,
         wrist_camera_matrix=False,
+        active_camera_matrix=False,
         record_gripper_closing=False,
         task_low_dim_state=False,
         state=False,
@@ -68,6 +70,7 @@ class ObservationConfig(object):
             CameraConfig() if overhead_camera is None else overhead_camera
         )
         self.wrist_camera = CameraConfig() if wrist_camera is None else wrist_camera
+        self.active_camera = (CameraConfig() if active_camera is None else active_camera) 
         self.front_camera = CameraConfig() if front_camera is None else front_camera
         self.joint_velocities = joint_velocities
         self.joint_velocities_noise = joint_velocities_noise
@@ -81,6 +84,7 @@ class ObservationConfig(object):
         self.gripper_joint_positions = gripper_joint_positions
         self.gripper_touch_forces = gripper_touch_forces
         self.wrist_camera_matrix = wrist_camera_matrix
+        self.active_camera_matrix = active_camera_matrix
         self.record_gripper_closing = record_gripper_closing
         self.task_low_dim_state = task_low_dim_state
         self.state = state
@@ -94,6 +98,7 @@ class ObservationConfig(object):
         self.right_shoulder_camera.set_all(value)
         self.overhead_camera.set_all(value)
         self.wrist_camera.set_all(value)
+        self.active_camera.set_all(value)
         self.front_camera.set_all(value)
 
     def set_all_low_dim(self, value: bool):
@@ -106,4 +111,5 @@ class ObservationConfig(object):
         self.gripper_joint_positions = value
         self.gripper_touch_forces = value
         self.wrist_camera_matrix = value
+        self.active_camera_matrix = value
         self.task_low_dim_state = value

@@ -35,8 +35,10 @@ PIL or standard image viewers.
 
 """
 
+import math
 import numpy as np
 from PIL import Image
+from scipy.spatial.transform import Rotation as R
 
 
 def ClipFloatValues(float_array, min_value, max_value):
@@ -225,3 +227,109 @@ def rgb_handles_to_mask(rgb_coded_handles):
   return (rgb_coded_handles[:, :, 0] +
           rgb_coded_handles[:, :, 1] * 256 +
           rgb_coded_handles[:, :, 2] * 256 * 256)
+
+
+class NoIntersectionError(Exception):
+    def __init__(self, message="No intersection found."):
+        self.message = message
+        super().__init__(self.message)
+
+def intersect_with_sphere(start_point:np.ndarray, end_point:np.ndarray, sphere_center:np.ndarray, vp_r:any=2.0):
+    
+    #end_point = start_point + direction    
+    # Calculate the direction vector from A to B
+    ray = end_point - start_point
+    
+    # Calculate the center of the sphere
+    c = sphere_center
+    
+    # Calculate the discriminant
+    discriminant = np.dot(ray, start_point - c)**2 - np.dot(ray, ray) *\
+        (np.dot(start_point - c, start_point - c) - vp_r**2)
+    
+    # Check if there's an intersection
+    if discriminant >= 0:
+        t = (-np.dot(ray, start_point - c) + np.sqrt(discriminant)) / np.dot(ray, ray)
+        intersection_point = start_point + t * ray
+        return intersection_point
+    else:
+
+        raise NoIntersectionError()
+
+def spherical_to_cartesian(vp,fixation=None,rad=True,ctg_rot=None):
+    absolute_r,absolute_theta,absolute_phi = tuple(vp)
+
+    if not rad:
+      absolute_theta = np.radians(absolute_theta)
+      absolute_phi = np.radians(absolute_phi)
+    
+
+    if absolute_phi<0:
+        absolute_phi += 2*np.pi
+    elif absolute_phi > 2*np.pi:
+        absolute_phi -= 2*np.pi 
+    
+    
+
+    camera_local_pos_x = absolute_r* np.sin(absolute_theta)*np.cos(absolute_phi)
+    camera_local_pos_y = absolute_r* np.sin(absolute_theta)*np.sin(absolute_phi)
+    camera_local_pos_z = absolute_r* np.cos(absolute_theta)
+    ltc_pos = np.array([camera_local_pos_x,camera_local_pos_y,camera_local_pos_z])
+
+    camera_axis_z = -ltc_pos/np.linalg.norm(ltc_pos)
+    local_z = np.array([0.0,0.0,1.0])
+    camera_axis_x = np.cross(ltc_pos,local_z)
+    camera_axis_x = camera_axis_x/np.linalg.norm(camera_axis_x)
+    camera_axis_y = np.cross(camera_axis_z,camera_axis_x)
+    ltc_rot = np.c_[camera_axis_x,np.c_[camera_axis_y,camera_axis_z]]
+    
+
+        
+    wtl_pos = fixation if fixation is not None else np.zeros([3,]) 
+    wtl_rot = np.array([1,0,0,
+                        0,1,0,
+                        0,0,1]).reshape(3,3) 
+    
+
+    wtc_pos = wtl_rot.dot(ltc_pos) + wtl_pos
+    wtc_rot = wtl_rot.dot(ltc_rot)
+
+    if ctg_rot is not None:
+      wtc_rot = wtc_rot.dot(ctg_rot) 
+
+
+    wtc_r = R.from_matrix(wtc_rot)
+    wtc_quat = wtc_r.as_quat() #[x,y,z,w]
+    wtc_euler = wtc_r.as_euler('xyz') #[x,y,z]
+    
+
+    return wtc_pos,wtc_euler,wtc_quat
+
+
+def cartesian_to_spherical(wtc_pos,fixation):
+    
+
+    wtl_pos = fixation 
+    wtl_rot = np.array([1,0,0,
+                        0,1,0,
+                        0,0,1]).reshape(3,3) 
+    
+    ltc_pos = wtl_rot.T.dot(wtc_pos) - wtl_rot.T.dot(wtl_pos)
+    
+
+    current_r = np.linalg.norm(ltc_pos)
+    current_theta = math.acos(ltc_pos[2]/current_r) 
+    current_phi = math.atan2(ltc_pos[1],ltc_pos[0])
+    
+
+    if current_phi>np.pi:
+        current_phi -= 2*np.pi
+
+    current_phi = np.rad2deg(current_phi)
+    current_theta = np.rad2deg(current_theta)
+
+    current_vp_spher = np.array([current_r,current_theta,current_phi])
+
+    
+
+    return current_vp_spher

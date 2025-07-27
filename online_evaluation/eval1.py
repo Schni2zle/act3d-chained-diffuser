@@ -4,6 +4,8 @@ from typing import Tuple, Optional
 from pathlib import Path
 import json
 import os
+import sys
+sys.path.append("/home/schnizzle/act3d_chained_diffuser")
 
 import torch
 import numpy as np

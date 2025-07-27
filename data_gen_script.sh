@@ -9,7 +9,7 @@ val_episodes_per_task=1
 image_size="256,256"
 
 
-processes=
+processes=3
 python data_preprocessing/dataset_generator.py \
     --save_path=$data_dir/$train_dir \
     --tasks=$task \
