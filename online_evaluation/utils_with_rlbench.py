@@ -284,7 +284,7 @@ class RLBenchEnv:
         self.apply_pc = apply_pc
         self.apply_cameras = apply_cameras
         self.fine_sampling_ball_diameter = fine_sampling_ball_diameter
-
+        print(f"Using cameras: {self.apply_cameras}")
         # setup RLBench environments
         self.obs_config = self.create_obs_config(
             image_size, apply_rgb, apply_depth, apply_pc, apply_cameras
@@ -797,6 +797,7 @@ class RLBenchEnv:
             left_shoulder_camera=kwargs.get("left_shoulder", unused_cams),
             right_shoulder_camera=kwargs.get("right_shoulder", unused_cams),
             wrist_camera=kwargs.get("wrist", unused_cams),
+            active_camera=kwargs.get("active", unused_cams),
             overhead_camera=kwargs.get("overhead", unused_cams),
             joint_forces=False,
             joint_positions=False,
