@@ -1,6 +1,8 @@
 """
 Precompute embeddings of instructions.
 """
+import sys
+sys.path.append("/home/kthrobotlab/act3d/act3d-chained-diffuser")
 import re
 import json
 from pathlib import Path
@@ -114,7 +116,7 @@ if __name__ == "__main__":
         data_path="",
         apply_rgb=True,
         apply_pc=True,
-        apply_cameras=("left_shoulder", "right_shoulder", "wrist"),
+        apply_cameras=("left_shoulder", "right_shoulder", "wrist", "active"),
         headless=True,
     )
 

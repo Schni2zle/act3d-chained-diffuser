@@ -1,11 +1,11 @@
 root=/tmp/rlbench
 data_dir=$root/datasets/raw
 output_dir=$root/datasets/packaged
-task=stack_blocks_edit
+task=stack_blocks
 train_dir="${task}_task_train"
 val_dir="${task}_task_val"
 train_episodes_per_task=1
-val_episodes_per_task=1
+val_episodes_per_task=10
 image_size="256,256"
 
 

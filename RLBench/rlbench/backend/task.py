@@ -394,12 +394,12 @@ class Task(object):
     def _feasible(self, waypoints: List[Point]) -> Tuple[bool, int]:
         arm = self.robot.arm
         last_feasible_subpoints = ['Placeholder']
-        print(f"ok lets check feasibility of waypoints {len(waypoints)}")
+        # print(f"ok lets check feasibility of waypoints {len(waypoints)}")
         start_vals = arm.get_joint_positions()
         for i, point in enumerate(waypoints):
 
             point_name = point._waypoint.get_name().split('_')
-            print("Checking feasibility of point: ", point_name)
+            # print("Checking feasibility of point: ", point_name)
             if len(point_name)==2 and point_name[-1]=='0':
 
                 if len(last_feasible_subpoints) == 0:

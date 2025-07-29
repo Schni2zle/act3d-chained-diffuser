@@ -332,6 +332,7 @@ class Scene(object):
             right_shoulder_mask=right_shoulder_mask,
             overhead_mask=overhead_mask,
             wrist_mask=wrist_mask,
+            active_mask=active_mask,
             front_mask=front_mask,
             joint_velocities=(
                 self._obs_config.joint_velocities_noise.apply(
@@ -912,6 +913,7 @@ class Scene(object):
                 if not mask:
                     mask_cam.remove()
                 else:
+                    # print(f"mask_cam: {mask_cam}, name: {mask_cam.get_name() if mask_cam else 'None'}")
                     mask_cam.set_explicit_handling(1)
                     mask_cam.set_resolution(conf.image_size)
         _set_rgb_props(
@@ -934,6 +936,10 @@ class Scene(object):
             self._obs_config.wrist_camera.depth,
             self._obs_config.wrist_camera)
         _set_rgb_props(
+            self._cam_active, self._obs_config.active_camera.rgb,
+            self._obs_config.active_camera.depth,
+            self._obs_config.active_camera)
+        _set_rgb_props(
             self._cam_front, self._obs_config.front_camera.rgb,
             self._obs_config.front_camera.depth,
             self._obs_config.front_camera)
@@ -952,6 +958,9 @@ class Scene(object):
         _set_mask_props(
             self._cam_wrist_mask, self._obs_config.wrist_camera.mask,
             self._obs_config.wrist_camera)
+        _set_mask_props(
+            self._cam_active_mask, self._obs_config.active_camera.mask,
+            self._obs_config.active_camera)
         _set_mask_props(
             self._cam_front_mask, self._obs_config.front_camera.mask,
             self._obs_config.front_camera)

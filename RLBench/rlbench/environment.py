@@ -49,11 +49,11 @@ class Environment(object):
         self._static_positions = static_positions
         self._robot_setup = robot_setup.lower()
 
-        action_mode = action_mode if isinstance(action_mode,List) else [action_mode]
+        # action_mode = action_mode if isinstance(action_mode,List) else [action_mode]
         #assert(len(robot_setup) == len(action_mode))
-        if len(robot_setup)>len(action_mode):
-            action_mode = action_mode*len(robot_setup)
-        self._action_mode = action_mode
+        # if len(robot_setup)>len(action_mode):
+        #     action_mode = action_mode*len(robot_setup)
+        # self._action_mode = action_mode
 
         self._randomize_every = randomize_every
         self._frequency = frequency

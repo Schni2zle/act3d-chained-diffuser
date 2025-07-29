@@ -33,7 +33,8 @@ class TaskEnvironment(object):
                  dataset_root: str,
                  obs_config: ObservationConfig,
                  static_positions: bool = False,
-                 attach_grasped_objects: bool = True):
+                 attach_grasped_objects: bool = True,
+                 shaped_rewards: bool = False):
         self._pyrep = pyrep
         self._robot = robot
         self._scene = scene
@@ -47,6 +48,7 @@ class TaskEnvironment(object):
         self._reset_called = False
         self._prev_ee_velocity = None
         self._enable_path_observations = False
+        self._shaped_rewards = shaped_rewards
 
         self._scene.load(self._task)
         self._pyrep.start()
@@ -108,7 +110,7 @@ class TaskEnvironment(object):
                 raise RuntimeError(
                     'User requested shaped rewards, but task %s does not have '
                     'a defined reward() function.' % self._task.get_name())
-        return self._scene.get_observation(), reward, terminate
+        return self._scene.get_observation(), reward, terminate, observations
     
     def step_active_cam(self, action:Dict[str,np.ndarray],eval:bool=False) -> Tuple[Observation, int, bool]:
 
@@ -217,6 +219,6 @@ class TaskEnvironment(object):
 
     def reset_to_demo(self, demo: Demo) -> (List[str], Observation):
         demo.restore_state()
-        variation_index = demo._observations[0].misc["variation_index"]
-        self.set_variation(variation_index)
+        # variation_index = demo._observations[0].misc["variation_index"]
+        # self.set_variation(variation_index)
         return self.reset()

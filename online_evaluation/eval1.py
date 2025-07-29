@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 import os
 import sys
-sys.path.append("/home/schnizzle/act3d_chained_diffuser")
+sys.path.append("/home/kthrobotlab/act3d/act3d-chained-diffuser")
 
 import torch
 import numpy as np
@@ -36,7 +36,7 @@ class Arguments(tap.Tap):
     arch: Optional[str] = None
     variations: Tuple[int, ...] = (-1,)
     data_dir: Path = Path(__file__).parent / "demos"
-    cameras: Tuple[str, ...] = ("left_shoulder", "right_shoulder", "wrist")
+    cameras: Tuple[str, ...] = ("left_shoulder", "right_shoulder","wrist", "active")
     image_size: str = "256,256"
     verbose: int = 0
     output_file: Path = Path(__file__).parent / "eval.json"

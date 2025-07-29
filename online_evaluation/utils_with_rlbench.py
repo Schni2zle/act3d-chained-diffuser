@@ -63,7 +63,9 @@ class Mover:
 
         for try_id in range(self._max_tries):
             obs, reward, terminate, other_obs = self._task.step(
-                action, collision_checking=collision_checking)
+                # action, collision_checking=collision_checking)
+                action)
+            
             if other_obs == []:
                 other_obs = [obs]
             for o in other_obs:
