@@ -10,7 +10,9 @@ import tap
 import torch
 import torch.distributed as dist
 from torch.nn import functional as F
-
+local_rank = int(os.environ["LOCAL_RANK"])
+torch.cuda.set_device(local_rank)
+torch.distributed.init_process_group(backend="nccl")
 from datasets import RLBenchDataset
 from engine import BaseTrainTester
 from utils.utils_without_rlbench import (
@@ -185,6 +187,13 @@ class TrainTester(BaseTrainTester):
             use_instruction=bool(args.use_instruction)
         )
         print("Model parameters:", count_parameters(_model))
+        local_rank = int(os.environ["LOCAL_RANK"])
+        _model = _model.to(local_rank)
+        _model = torch.nn.parallel.DistributedDataParallel(
+            _model,
+            device_ids=[local_rank],
+            output_device=local_rank
+        )
 
         return _model
 
@@ -513,8 +522,14 @@ if __name__ == '__main__':
     random.seed(args.seed)
 
     # DDP initialization
-    torch.cuda.set_device(args.local_rank)
-    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    local_rank = int(os.environ["LOCAL_RANK"])
+    print("Local rank:", local_rank)
+    torch.cuda.set_device(local_rank)
+    # torch.cuda.set_device(args.local_rank)
+    if not dist.is_initialized():
+        torch.cuda.set_device(args.local_rank)
+        dist.init_process_group(backend="nccl", init_method="env://")
+    # torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
