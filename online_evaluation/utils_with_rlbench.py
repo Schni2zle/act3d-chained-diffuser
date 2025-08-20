@@ -438,6 +438,7 @@ class RLBenchEnv:
         if num_variations > 0:
             task_variations = np.minimum(num_variations, task_variations)
             task_variations = range(task_variations)
+            print(f"Evaluating {task_str} with {task_variations} variations")
         else:
             task_variations = glob.glob(os.path.join(self.data_path, task_str, "variation*"))
             task_variations = [int(n.split('/')[-1].replace('variation', '')) for n in task_variations]

@@ -147,9 +147,11 @@ def load_models(args):
 
     if args.predict_keypose:
         act3d_model_dict = torch.load(args.act3d_checkpoint, map_location="cpu")
+        # print([k for k in act3d_model_dict["weight"].keys()][:50])
+
         act3d_model_dict_weight = {}
         for key in act3d_model_dict["weight"]:
-            _key = key[7:]
+            _key = key[14:]
             act3d_model_dict_weight[_key] = act3d_model_dict["weight"][key]
         act3d_model.load_state_dict(act3d_model_dict_weight)
         act3d_model.eval()

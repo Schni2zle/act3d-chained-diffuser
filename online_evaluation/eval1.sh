@@ -3,8 +3,9 @@ exp=ten_demo_baseline
 tasks=(
     stack_blocks
 )
-data_dir=/tmp/rlbench/datasets/raw/stack_blocks_task_val/
-num_episodes=10
+# data_dir=/tmp/rlbench/datasets/raw/stack_blocks_task_val/
+data_dir=/home/kthrobotlab/RLBench/datasets/raw/stack_blocks_task_val/
+num_episodes=100
 gripper_loc_bounds_file=10_tough_diffusion_location_bounds.json
 act3d_gripper_loc_bounds_file=tasks/74_hiveformer_tasks_location_bounds.json
 
