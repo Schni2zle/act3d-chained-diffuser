@@ -70,6 +70,7 @@ class Scene(object):
         self._set_camera_properties()
 
         x, y, z = self._workspace.get_position()
+        
         minx, maxx, miny, maxy, _, _ = self._workspace.get_bounding_box()
         self._workspace_minx = x - np.fabs(minx) - 0.2
         self._workspace_maxx = x + maxx + 0.2
@@ -77,7 +78,7 @@ class Scene(object):
         self._workspace_maxy = y + maxy + 0.2
         self._workspace_minz = z
         self._workspace_maxz = z + 1.0  # 1M above workspace
-
+                       
         self.target_workspace_check = Dummy.create()
         self._step_callback = None
 
@@ -888,6 +889,10 @@ class Scene(object):
 
     def check_target_in_workspace(self, target_pos: np.ndarray) -> bool:
         x, y, z = target_pos
+        print(f'Checking target position: x: {x}, y: {y}, z: {z}')
+        print(f'Workspace limits: x: [{self._workspace_minx}, {self._workspace_maxx}],'
+              f'y: [{self._workspace_miny}, {self._workspace_maxy}], '
+              f'z: [{self._workspace_minz}, {self._workspace_maxz}]')
         return (self._workspace_maxx > x > self._workspace_minx and
                 self._workspace_maxy > y > self._workspace_miny and
                 self._workspace_maxz > z > self._workspace_minz)

@@ -64,7 +64,9 @@ def get_gripper_loc_bounds(path: str, buffer: float = 0.0, task: Optional[str] =
         gripper_loc_bounds_min = np.min(np.stack([bounds[0] for bounds in gripper_loc_bounds.values()]), axis=0) - buffer
         gripper_loc_bounds_max = np.max(np.stack([bounds[1] for bounds in gripper_loc_bounds.values()]), axis=0) + buffer
         gripper_loc_bounds = np.stack([gripper_loc_bounds_min, gripper_loc_bounds_max])
-    print("Gripper workspace size:", gripper_loc_bounds_max - gripper_loc_bounds_min)
+    # print("Gripper workspace size:", gripper_loc_bounds_max - gripper_loc_bounds_min)
+    # print("Gripper workspace min:", gripper_loc_bounds_min)
+    # print("Gripper workspace max:", gripper_loc_bounds_max)
     return gripper_loc_bounds
 
 

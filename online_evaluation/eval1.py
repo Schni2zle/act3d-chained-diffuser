@@ -87,7 +87,7 @@ def load_models(args):
         args.gripper_loc_bounds_file,
         task=None, buffer=0.04
     )
-    print('Keypose gripper workspace')
+    # print('Keypose gripper workspace')
     act3d_gripper_loc_bounds = get_gripper_loc_bounds(
         args.act3d_gripper_loc_bounds_file,
         task=task, buffer=0.04

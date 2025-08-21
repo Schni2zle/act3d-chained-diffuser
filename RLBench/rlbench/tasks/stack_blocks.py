@@ -25,6 +25,10 @@ class StackBlocks(Task):
 
         self.boundaries = [Shape('stack_blocks_boundary%d' % i)
                            for i in range(4)]
+        # print('Boundaries of stack_blocks:', self.boundaries)
+        # for i in range(len(self.boundaries)):
+        #     x, y, z = self.boundaries[i].get_position()
+        #     # print('Workspace position for slack blocks:', i, x, y, z)
 
         self.register_graspable_objects(self.target_blocks + self.distractors)
 

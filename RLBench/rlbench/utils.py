@@ -187,7 +187,7 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                                 Image.open(obs[i].wrist_rgb),
                                 obs_config.wrist_camera.image_size))
                     if obs_config.active_camera.rgb:
-                        print("Active Camera RGB:", obs[i].active_rgb)
+                        # print("Active Camera RGB:", obs[i].active_rgb)
                         obs[i].active_rgb = np.array(
                             _resize_if_needed(
                                 Image.open(obs[i].active_rgb),
@@ -343,7 +343,7 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                                 obs_config.wrist_camera.image_size)))
                     
                     if obs_config.active_camera.mask:
-                        print("Active Camera Mask:", obs[i].active_mask)
+                        # print("Active Camera Mask:", obs[i].active_mask)
                         obs[i].active_mask = rgb_handles_to_mask(np.array(
                             _resize_if_needed(Image.open(
                                 obs[i].active_mask),
