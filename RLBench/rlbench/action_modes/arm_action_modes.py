@@ -171,9 +171,7 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
             pos_to_check = scene.target_workspace_check.get_position()
         if not scene.check_target_in_workspace(pos_to_check):
             raise InvalidActionError('A path could not be found because the '
-                                     f'target is outside of workspace{pos_to_check}.')
-        else:
-            print("Target position is within workspace:", pos_to_check)
+                                     'target is outside of workspace.')
 
     def _pose_in_end_effector_frame(self, robot: Robot, action: np.ndarray):
         a_x, a_y, a_z, a_qx, a_qy, a_qz, a_qw = action
@@ -196,35 +194,30 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
         self._quick_boundary_check(scene, action)
 
         colliding_shapes = []
-        # if self._collision_checking:
-        #     if self._robot_shapes is None:
-        #         self._robot_shapes = scene.robot.arm.get_objects_in_tree(
-        #             object_type=ObjectType.SHAPE)
-        #     # First check if we are colliding with anything
-        #     colliding = scene.robot.arm.check_arm_collision()
-        #     if colliding:
-        #         # Disable collisions with the objects that we are colliding with
-        #         grasped_objects = scene.robot.gripper.get_grasped_objects()
-        #         colliding_shapes = [
-        #             s for s in scene.pyrep.get_objects_in_tree(
-        #                 object_type=ObjectType.SHAPE) if (
-        #                     s.is_collidable() and
-        #                     s not in self._robot_shapes and
-        #                     s not in grasped_objects and
-        #                     scene.robot.arm.check_arm_collision(
-        #                         s))]
-        #         [s.set_collidable(False) for s in colliding_shapes]
+        if self._collision_checking:
+            if self._robot_shapes is None:
+                self._robot_shapes = scene.robot.arm.get_objects_in_tree(
+                    object_type=ObjectType.SHAPE)
+            # First check if we are colliding with anything
+            colliding = scene.robot.arm.check_arm_collision()
+            if colliding:
+                # Disable collisions with the objects that we are colliding with
+                grasped_objects = scene.robot.gripper.get_grasped_objects()
+                colliding_shapes = [
+                    s for s in scene.pyrep.get_objects_in_tree(
+                        object_type=ObjectType.SHAPE) if (
+                            s.is_collidable() and
+                            s not in self._robot_shapes and
+                            s not in grasped_objects and
+                            scene.robot.arm.check_arm_collision(
+                                s))]
+                [s.set_collidable(False) for s in colliding_shapes]
 
         try:
-            # Try to find a path using the configuration space
-            # print("Planning path with collision checking:", self._collision_checking)
-            # print("Planning path with relative_to:", relative_to)
-            print("Planning path with action:", action)
             path = scene.robot.arm.get_path(
                 action[:3],
                 quaternion=action[3:],
-                # ignore_collisions=not self._collision_checking,
-                ignore_collisions=True,
+                ignore_collisions=not self._collision_checking,
                 relative_to=relative_to,
                 trials=100,
                 max_configs=10,
@@ -232,14 +225,11 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                 trials_per_goal=5,
                 algorithm=Algos.RRTConnect
             )
-            # [s.set_collidable(True) for s in colliding_shapes]
+            [s.set_collidable(True) for s in colliding_shapes]
         except ConfigurationPathError as e:
             print("Could not find a path avoiding collisions, "
                   "trying to find one ignoring collisions.")
             try:
-                # print("Planning path with collision checking:", self._collision_checking)
-                # print("Planning path with relative_to:", relative_to)
-                print("Planning path with action:", action)
                 path = scene.robot.arm.get_path(
                     action[:3],
                     quaternion=action[3:],
@@ -251,12 +241,12 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                     trials_per_goal=5,
                     algorithm=Algos.RRTConnect
                 )
-                # [s.set_collidable(True) for s in colliding_shapes]
+                [s.set_collidable(True) for s in colliding_shapes]
             except ConfigurationPathError as e:
-                # [s.set_collidable(True) for s in colliding_shapes]
+                [s.set_collidable(True) for s in colliding_shapes]
                 raise InvalidActionError(
                     'A path could not be found. Most likely due to the target '
-                    f'being inaccessible or a collison was detected.{action[:3]}') from e
+                    'being inaccessible or a collison was detected.') from e
         # DEBUG
         observations = []
 
@@ -270,16 +260,13 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                 self._callable_each_step(scene.get_observation())
 
             # DEBUG
-            observations.append(scene.get_observation())
+            # observations.append(scene.get_observation())
 
             success, terminate = scene.task.success()
             # If the task succeeds while traversing path, then break early
             if success and self._callable_each_step is None:
                 break
-        print("Trajectory length:", len(observations))
-        # for i, obs in enumerate(observations):  # first 5 steps
-            # self._quick_boundary_check(scene, obs.gripper_pose[:7])
-            # print(i, obs.gripper_pose)
+
         return observations
 
     def action_shape(self, scene: Scene) -> tuple:

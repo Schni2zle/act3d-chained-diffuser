@@ -312,6 +312,7 @@ class Arm(RobotComponent):
                 'Specify either euler or quaternion values, but not both.')
 
         prev_pose = self._ik_target.get_pose()
+        print(f"Planning linear path to: {position}, from {prev_pose[:3]}")
         self._ik_target.set_position(position, relative_to)
         if euler is not None:
             self._ik_target.set_orientation(euler, relative_to)
@@ -438,6 +439,7 @@ class Arm(RobotComponent):
                                      relative_to=relative_to)
             return p
         except ConfigurationPathError:
+            print("Linear path could not be found, trying non-linear path.")
             pass  # Allowed. Try again, but with non-linear.
 
         # This time if an exception is thrown, we dont want to catch it.

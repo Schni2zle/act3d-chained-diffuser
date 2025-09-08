@@ -116,7 +116,7 @@ if __name__ == "__main__":
         data_path="",
         apply_rgb=True,
         apply_pc=True,
-        apply_cameras=("left_shoulder", "right_shoulder", "wrist", "active"),
+        apply_cameras=("left_shoulder", "right_shoulder", "wrist"),
         headless=True,
     )
 

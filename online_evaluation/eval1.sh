@@ -10,7 +10,7 @@ gripper_loc_bounds_file=10_tough_diffusion_location_bounds.json
 act3d_gripper_loc_bounds_file=tasks/74_hiveformer_tasks_location_bounds.json
 
 use_instruction=1
-act3d_use_instruction=0
+act3d_use_instruction=1
 headless=0
 offline=0
 max_tries=2

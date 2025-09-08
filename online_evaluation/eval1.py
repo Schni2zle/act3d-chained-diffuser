@@ -140,14 +140,14 @@ def load_models(args):
         diffusion_model_dict = torch.load(args.diff_checkpoint, map_location="cpu")
         diffusion_model_dict_weight = {}
         for key in diffusion_model_dict["weight"]:
-            _key = key[7:]
+            _key = key[14:]
             diffusion_model_dict_weight[_key] = diffusion_model_dict["weight"][key]
         diffusion_model.load_state_dict(diffusion_model_dict_weight)
         diffusion_model.eval()
 
     if args.predict_keypose:
         act3d_model_dict = torch.load(args.act3d_checkpoint, map_location="cpu")
-        # print([k for k in act3d_model_dict["weight"].keys()][:50])
+        print([k for k in act3d_model_dict["weight"].keys()][:50])
 
         act3d_model_dict_weight = {}
         for key in act3d_model_dict["weight"]:
