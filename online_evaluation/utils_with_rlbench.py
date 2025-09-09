@@ -21,8 +21,13 @@ from rlbench.action_modes.gripper_action_modes import Discrete
 from rlbench.action_modes.arm_action_modes import EndEffectorPoseViaPlanning
 from rlbench.backend.exceptions import InvalidActionError
 from rlbench.demo import Demo
+
 from pyrep.errors import IKError, ConfigurationPathError
 from pyrep.const import RenderMode
+
+from yarr.agents.agent import Agent
+from yarr.envs.env import Env
+from yarr.utils.transition import ReplayTransition
 
 from utils.utils_without_rlbench import TASK_TO_ID
 
@@ -37,6 +42,174 @@ def task_file_to_task_class(task_file):
     task_class = getattr(mod, class_name)
     return task_class
 
+
+class NBVTrajectoryEvaluator:
+    """
+    Integrates Next Best View (NBV) logic into trajectory execution.
+    Combines viewpoint planning with action prediction.
+    """
+    
+    def __init__(self, 
+                 nbv_agent,  # Agent for viewpoint prediction
+                 viewpoint_env_bounds,  # Viewpoint constraints
+                 viewpoint_axes_movable,  # Which axes can move
+                 scene_bounds,  # Scene boundaries
+                 device='cuda',
+                 viewpoint_align=True):
+        
+        self.nbv_agent = nbv_agent
+        self.viewpoint_env_bounds = viewpoint_env_bounds
+        self.viewpoint_axes_movable = viewpoint_axes_movable
+        self.scene_bounds = scene_bounds
+        self.device = device
+        self.viewpoint_align = viewpoint_align
+        self.env = Environment(
+            self.action_mode, str(data_path), self.obs_config,
+            headless=headless)
+        # Keys to save from observations (adapt to your needs)
+        self.SAVE_OBS_KEYS = ["active_point_cloud", "low_dim_state", "active_rgb", "attention_input"]
+
+    def predict_next_best_view(self, obs_dict, timesteps=1):
+        """
+        Predicts the next best viewpoint given current observations.
+        
+        Args:
+            obs_dict: Dictionary of current observations
+            timesteps: Number of timesteps to process
+            
+        Returns:
+            tuple: (viewpoint_goal, attention_point, processed_obs)
+        """
+        nbv_input_obs_dict = {key: [] for key in self.SAVE_OBS_KEYS}
+        
+        for step_index in range(timesteps):
+            # Extract current state
+            gp_world_pos = obs_dict["gripper_pose"][step_index][:3]
+            gp_world_quat = self._normalize_quaternion(obs_dict["gripper_pose"][step_index][3:])
+            vp_world_cart_pos = obs_dict["active_cam_pose"][step_index][:3]
+            
+            # Handle time state if available
+            time_state = (obs_dict["low_dim_state"][step_index][[-1]] 
+                         if "time_in_state" in obs_dict and obs_dict["time_in_state"]
+                         else np.array([]))
+            
+            # Extract gripper tip state
+            gp_tip_state = np.concatenate([
+                obs_dict["low_dim_state"][step_index][[0]],
+                obs_dict["low_dim_state"][step_index][8:10]
+            ])
+            
+            pc_world = obs_dict["active_point_cloud"][step_index]
+            
+            # Normalize quaternion
+            if gp_world_quat[-1] < 0:
+                gp_world_quat = -gp_world_quat
+            
+            # Convert to spherical coordinates
+            _, vp_world_spher = self._world_cart_to_disc_world_spher(vp_world_cart_pos)
+            norm_vp_world_spher = self._viewpoint_normalize(vp_world_spher, self.viewpoint_env_bounds)
+            
+            # Construct low-dim state
+            low_dim_state_world = np.concatenate([
+                gp_tip_state,
+                gp_world_pos,
+                gp_world_quat,
+                norm_vp_world_spher[self.viewpoint_axes_movable],
+                time_state
+            ], axis=-1)
+            
+            # Apply viewpoint alignment if requested
+            pc_processed = pc_world
+            low_dim_state_processed = low_dim_state_world
+            
+            if self.viewpoint_align:
+                wtl_rot = self._world_to_local_rotation(vp_world_cart_pos)
+                
+                # Transform gripper pose to local coordinates
+                gp_local_pos, gp_local_quat, _ = self._world_pose_to_local_pose(
+                    wtl_rot, gp_world_pos, gp_world_quat
+                )
+                
+                # Transform point cloud to local coordinates
+                pc_processed = self._world_pc_to_local_pc(vp_world_cart_pos, pc_world)
+                
+                # Reconstruct low-dim state in local coordinates
+                low_dim_state_processed = np.concatenate([
+                    gp_tip_state,
+                    gp_local_pos,
+                    gp_local_quat,
+                    norm_vp_world_spher[self.viewpoint_axes_movable],
+                    time_state
+                ], axis=-1)
+            
+            # Store processed observations
+            nbv_input_obs_dict["active_point_cloud"].append(
+                pc_processed.astype(obs_dict["active_point_cloud"][step_index].dtype)
+            )
+            nbv_input_obs_dict["low_dim_state"].append(
+                low_dim_state_processed.astype(obs_dict["low_dim_state"][step_index].dtype)
+            )
+            nbv_input_obs_dict["active_rgb"].append(obs_dict["active_rgb"][step_index])
+            nbv_input_obs_dict["attention_input"].append(np.zeros((3,), dtype=np.float32))
+        
+        # Prepare data for NBV agent
+        prepped_data = {
+            k: torch.tensor(np.array(v)[None], device=self.device)
+            for k, v in nbv_input_obs_dict.items()
+        }
+        
+        # Get NBV prediction
+        with torch.no_grad():
+            nbv_output = self.nbv_agent.act(
+                step=0,  # You might want to pass actual step
+                observation=prepped_data,
+                deterministic=True  # Use deterministic for evaluation
+            )
+        
+        # Extract viewpoint goal (first 3 elements are typically spherical coordinates)
+        vp_local_spher_goal = nbv_output.action[:3]
+        
+        # Get current viewpoint for inverse alignment
+        vp_world_spher_goal = vp_local_spher_goal.copy()
+        
+        if self.viewpoint_align:
+            # Inverse-align the viewpoint goal
+            vp_world_spher_goal = vp_world_spher.copy()
+            vp_world_spher_goal[1] = vp_local_spher_goal[1]
+            vp_world_spher_goal[2] += vp_local_spher_goal[2]
+        
+        # Clip to environment bounds
+        vp_world_spher_goal = np.clip(
+            vp_world_spher_goal,
+            self.viewpoint_env_bounds[:3],
+            self.viewpoint_env_bounds[3:]
+        )
+        
+        # Convert spherical to world pose
+        vp_world_cart_pose_goal = self._local_spher_to_world_pose(vp_world_spher_goal)
+        
+        # Extract attention point from NBV output
+        nbv_agent_obs_elems = {k: np.array(v) for k, v in nbv_output.observation_elements.items()}
+        attention_local_pos_goal = nbv_agent_obs_elems.get("attention_output", np.zeros(3))
+        
+        # Transform attention point to world coordinates if needed
+        if self.viewpoint_align:
+            attention_world_pos_goal, _ = self._local_pose_to_world_pose(
+                attention_local_pos_goal,
+                np.array([0, 0, 0, 1]),  # Dummy orientation
+                vp_world_cart_pos
+            )
+        else:
+            attention_world_pos_goal = attention_local_pos_goal
+            
+        # Clip attention point to scene bounds
+        attention_world_pos_goal = np.clip(
+            attention_world_pos_goal,
+            self.scene_bounds[:3],
+            self.scene_bounds[3:]
+        )
+        
+        return vp_world_cart_pose_goal, attention_world_pos_goal, nbv_input_obs_dict
 
 class Mover:
 
@@ -307,6 +480,14 @@ class RLBenchEnv:
         self.image_size = image_size
         self.exec168 = exec168
 
+        nbv_evaluator = NBVTrajectoryEvaluator(
+            nbv_agent=your_nbv_agent,
+            viewpoint_env_bounds=your_bounds,
+            viewpoint_axes_movable=[1, 2],  # Which axes can move
+            scene_bounds=your_scene_bounds,
+            viewpoint_align=True
+        )
+
     def get_obs_action(self, obs):
         """
         Fetch the desired state and action based on the provided demo.
@@ -489,6 +670,7 @@ class RLBenchEnv:
         num_demos: int,
         log_dir: Optional[Path],
         actioner: Actioner,
+        use_nbv_frequency: int = 1,  # How often to update viewpoint (1 = every step)
         max_tries: int = 1,
         save_attn: bool = False,
         record_videos: bool = False,
@@ -502,7 +684,6 @@ class RLBenchEnv:
         act3d_gripper_input_history=1,
     ):
         device = actioner.device
-
         success_rate = 0
         num_valid_demos = 0
         total_reward = 0
@@ -530,11 +711,40 @@ class RLBenchEnv:
             move = Mover(task, max_tries=max_tries)
             reward = None
             max_reward = 0.0
+            # Track current viewpoint
+            current_viewpoint = None
+            attention_point = None
             gt_keyframe_actions, _, gt_trajectory_masks = actioner.get_action_from_demo(demo)
             if offline:
                 max_steps = len(gt_keyframe_actions)
 
             for step_id in range(max_steps):
+
+                # Update viewpoint using NBV if it's time
+                if step_id % use_nbv_frequency == 0:
+                    if verbose:
+                        print(f"Computing NBV for step {step_id}")
+                    
+                    # Convert obs to format expected by NBV
+                    obs_dict = self._convert_obs_to_nbv_format(obs)
+                    
+                    # Get new viewpoint and attention point
+                    new_viewpoint, attention_point, _ = self.nbv_agent.predict_next_best_view(obs_dict)
+                    
+                    # Move camera to new viewpoint if it changed significantly
+                    if (current_viewpoint is None or 
+                        np.linalg.norm(new_viewpoint[:3] - current_viewpoint[:3]) > 0.1):
+                        
+                        if verbose:
+                            print(f"Moving to new viewpoint: {new_viewpoint[:3]}")
+                        
+                        # Execute viewpoint change
+                        obs, _, _, _ = task.step(new_viewpoint, 'vision', False)
+                        current_viewpoint = new_viewpoint
+                        
+                        # Add attention point visualization if supported
+                        if hasattr(self.scene, 'show_point') and attention_point is not None:
+                            task.show_point(attention_point)
 
                 # Fetch the current observation, and predict one action
                 rgb, pcd, gripper = self.get_rgb_pcd_gripper_from_obs(obs)
